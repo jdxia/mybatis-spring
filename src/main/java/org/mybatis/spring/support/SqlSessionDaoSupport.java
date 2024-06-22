@@ -49,6 +49,7 @@ public abstract class SqlSessionDaoSupport extends DaoSupport {
    */
   public void setSqlSessionFactory(SqlSessionFactory sqlSessionFactory) {
     if (this.sqlSessionTemplate == null || sqlSessionFactory != this.sqlSessionTemplate.getSqlSessionFactory()) {
+      // 创建, 这边把 sqlSessionFactory 传进去了, 为啥要传进去 ,因为还是要 通过 sqlSessionFactory 生成 DefaultSqlSession
       this.sqlSessionTemplate = createSqlSessionTemplate(sqlSessionFactory);
     }
   }
@@ -97,6 +98,9 @@ public abstract class SqlSessionDaoSupport extends DaoSupport {
    * @return Spring managed thread safe SqlSession
    */
   public SqlSession getSqlSession() {
+    /**
+     * 这个 sqlSessionTemplate 是在 set 里面初始化的, 同样的类 {@link SqlSessionDaoSupport#setSqlSessionFactory(SqlSessionFactory)}
+     */
     return this.sqlSessionTemplate;
   }
 

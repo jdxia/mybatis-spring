@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:aop="http://www.springframework.org/schema/aop"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xmlns:task="http://www.springframework.org/schema/task"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+		http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/context
+		http://www.springframework.org/schema/context/spring-context.xsd
+		http://www.springframework.org/schema/aop
+		http://www.springframework.org/schema/aop/spring-aop.xsd
+		http://www.springframework.org/schema/tx
+		http://www.springframework.org/schema/tx/spring-tx.xsd
+		http://www.springframework.org/schema/task
+         http://www.springframework.org/schema/task/spring-task.xsd">
+
+
+    <!-- 开启Mapper接口扫描, 核心是MapperScannerConfigurer  -->
+    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <property name="basePackage" value="com.example.demo.mapper" />
+        <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"/>
+    </bean>
+
+
+    <bean id="dataSource" class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+        <property name="driverClassName" value="com.mysql.cj.jdbc.Driver"/>
+        <property name="url" value="jdbc:mysql://localhost:3306/mybatis?characterEncoding=utf-8&amp;verifyServerCertificate=false&amp;useSSL=false&amp;allowPublicKeyRetrieval=true"/>
+        <property name="username" value="root"/>
+        <property name="password" value="hello.world123"/>
+    </bean>
+
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource"/>
+    </bean>
+
+
+    <!--
+     MapperFactoryBean 承了SqlSessionDaoSupport, SqlSessionDaoSupport 里面有个 setSqlSessionFactory 方法会用到 sqlSessionFactory
+     和spring 结合, 拿sqlSession也用到, (SqlSessionHolder) TransactionSynchronizationManager.getResource(sessionFactory);
+        -->
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+        <property name="dataSource" ref="dataSource"/>
+        <!-- MyBatis全局配置文件 -->
+        <property name="configLocation" value="classpath:mybatis-config.xml"/>
+
+        <!--注册Mapper.xm映射器-->
+        <property name="mapperLocations" value="classpath:mapper/*.xml"/>
+
+<!--        还可以配置其他属性，完全取代mybatis-config.xml中的配置-->
+<!--        <property name="typeAliasesPackage" value="com.example.demo.xx"/>-->
+    </bean>
+
+    <!--SqlSessionTemplate:就是我们使用的sqlSession-->
+    <bean id="sqlSession" class="org.mybatis.spring.SqlSessionTemplate">
+        <!--只能使用构造器进行注入，因为没有set方法-->
+        <constructor-arg index="0" ref="sqlSessionFactory"/>
+    </bean>
+
+    <tx:annotation-driven transaction-manager="transactionManager"/>
+
+    <!-- 扫描 -->
+    <context:component-scan base-package="com.example.demo.service">
+    </context:component-scan>
+
+</beans>
