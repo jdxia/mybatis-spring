@@ -53,6 +53,7 @@ import org.springframework.beans.factory.FactoryBean;
  */
 public class MapperFactoryBean<T> extends SqlSessionDaoSupport implements FactoryBean<T> {
 
+  // Mapper接口类型
   private Class<T> mapperInterface;
 
   private boolean addToConfig = true;
@@ -92,6 +93,11 @@ public class MapperFactoryBean<T> extends SqlSessionDaoSupport implements Factor
    */
   @Override
   public T getObject() throws Exception {
+    /**
+     * 与MyBatis单独使用类似，都是通过sqlSession调用getMapper()方法获取对应的Mapper。 需要注意的是入参是一个接口类型，而出参是MyBatis生成的代理对象
+     *
+     * getSqlSession 方法返回的是 sqlSessionTemplate
+     */
     return getSqlSession().getMapper(this.mapperInterface);
   }
 
@@ -100,6 +106,7 @@ public class MapperFactoryBean<T> extends SqlSessionDaoSupport implements Factor
    */
   @Override
   public Class<T> getObjectType() {
+    // Object的类型
     return this.mapperInterface;
   }
 

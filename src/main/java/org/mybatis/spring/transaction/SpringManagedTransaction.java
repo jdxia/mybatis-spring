@@ -45,12 +45,15 @@ public class SpringManagedTransaction implements Transaction {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SpringManagedTransaction.class);
 
+  // 数据源
   private final DataSource dataSource;
 
+  // JDBC的链接对象
   private Connection connection;
 
   private boolean isConnectionTransactional;
 
+  // 自动提交事务
   private boolean autoCommit;
 
   public SpringManagedTransaction(DataSource dataSource) {
@@ -58,12 +61,14 @@ public class SpringManagedTransaction implements Transaction {
     this.dataSource = dataSource;
   }
 
+  // 获取连接
   /**
    * {@inheritDoc}
    */
   @Override
   public Connection getConnection() throws SQLException {
     if (this.connection == null) {
+      // 从spring哪里获取
       openConnection();
     }
     return this.connection;
@@ -76,7 +81,9 @@ public class SpringManagedTransaction implements Transaction {
    * It also reads autocommit setting because when using Spring Transaction MyBatis thinks that autocommit is always
    * false and will always call commit/rollback so we need to no-op that calls.
    */
+  // 打开connection
   private void openConnection() throws SQLException {
+    // 从spring哪里获取, 并且保存起来
     this.connection = DataSourceUtils.getConnection(this.dataSource);
     this.autoCommit = this.connection.getAutoCommit();
     this.isConnectionTransactional = DataSourceUtils.isConnectionTransactional(this.connection, this.dataSource);
@@ -88,6 +95,7 @@ public class SpringManagedTransaction implements Transaction {
   /**
    * {@inheritDoc}
    */
+  // 提交事务，使用的是connection.commit
   @Override
   public void commit() throws SQLException {
     if (this.connection != null && !this.isConnectionTransactional && !this.autoCommit) {
@@ -99,6 +107,7 @@ public class SpringManagedTransaction implements Transaction {
   /**
    * {@inheritDoc}
    */
+  // 回滚事务
   @Override
   public void rollback() throws SQLException {
     if (this.connection != null && !this.isConnectionTransactional && !this.autoCommit) {
@@ -110,6 +119,7 @@ public class SpringManagedTransaction implements Transaction {
   /**
    * {@inheritDoc}
    */
+  // 关闭链接
   @Override
   public void close() throws SQLException {
     DataSourceUtils.releaseConnection(this.connection, this.dataSource);

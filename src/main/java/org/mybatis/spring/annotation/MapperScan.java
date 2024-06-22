@@ -76,10 +76,11 @@ import org.springframework.context.annotation.Import;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 @Documented
-@Import(MapperScannerRegistrar.class)
+@Import(MapperScannerRegistrar.class)  // 导入了这个类
 @Repeatable(MapperScans.class)
 public @interface MapperScan {
 
+  // basePackages属性的别名，等价于basePackages
   /**
    * Alias for the {@link #basePackages()} attribute. Allows for more concise annotation declarations e.g.:
    * {@code @MapperScan("org.my.pkg")} instead of {@code @MapperScan(basePackages = "org.my.pkg"})}.
@@ -88,6 +89,7 @@ public @interface MapperScan {
    */
   String[] value() default {};
 
+  // 扫描的包名
   /**
    * Base packages to scan for MyBatis interfaces. Note that only interfaces with at least one method will be
    * registered; concrete classes will be ignored.
@@ -96,6 +98,7 @@ public @interface MapperScan {
    */
   String[] basePackages() default {};
 
+  // 可以提供一个类，以类的包名作为扫描的包
   /**
    * Type-safe alternative to {@link #basePackages()} for specifying the packages to scan for annotated components. The
    * package of each class specified will be scanned.
@@ -107,6 +110,7 @@ public @interface MapperScan {
    */
   Class<?>[] basePackageClasses() default {};
 
+  // BeanName的生成器，一般用默认的就好啦
   /**
    * The {@link BeanNameGenerator} class to be used for naming detected components within the Spring container.
    *
@@ -114,6 +118,7 @@ public @interface MapperScan {
    */
   Class<? extends BeanNameGenerator> nameGenerator() default BeanNameGenerator.class;
 
+  // 指定要扫描的注解
   /**
    * This property specifies the annotation that the scanner will search for.
    * <p>
@@ -125,6 +130,7 @@ public @interface MapperScan {
    */
   Class<? extends Annotation> annotationClass() default Annotation.class;
 
+  // 指定标记接口，只有继承了这个接口才会被扫描
   /**
    * This property specifies the parent that the scanner will search for.
    * <p>
@@ -137,6 +143,8 @@ public @interface MapperScan {
    */
   Class<?> markerInterface() default Class.class;
 
+  // 指定SqlSessionTemplate的名称，
+  // SqlSessionTemplate是Spring对Mybatis中SqlSession的封装
   /**
    * Specifies which {@code SqlSessionTemplate} to use in the case that there is more than one in the spring context.
    * Usually this is only needed when you have more than one datasource.
@@ -145,6 +153,7 @@ public @interface MapperScan {
    */
   String sqlSessionTemplateRef() default "";
 
+  // 指定SqlSessionFactory的名称
   /**
    * Specifies which {@code SqlSessionFactory} to use in the case that there is more than one in the spring context.
    * Usually this is only needed when you have more than one datasource.
@@ -153,6 +162,9 @@ public @interface MapperScan {
    */
   String sqlSessionFactoryRef() default "";
 
+  // 这个属性是什么意思呢？Spring跟Mybatis整合
+  // 最重要的事情就是将Mybatis生成的代理对象交由Spring来管理
+  // 实现这个功能的就是这个MapperFactoryBean
   /**
    * Specifies a custom MapperFactoryBean to return a mybatis proxy as spring bean.
    *
@@ -160,6 +172,7 @@ public @interface MapperScan {
    */
   Class<? extends MapperFactoryBean> factoryBean() default MapperFactoryBean.class;
 
+  // 是否对mapper进行懒加载，默认为false
   /**
    * Whether enable lazy initialization of mapper bean.
    *

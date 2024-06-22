@@ -167,12 +167,16 @@ public class ClassPathMapperScanner extends ClassPathBeanDefinitionScanner {
     boolean acceptAllInterfaces = true;
 
     // if specified, use the given annotation and / or marker interface
+    // 第一步，判断是否要扫描指定的注解
+    // 也就是判断在@MapperScan注解中是否指定了要扫描的注解
     if (this.annotationClass != null) {
       addIncludeFilter(new AnnotationTypeFilter(this.annotationClass));
       acceptAllInterfaces = false;
     }
 
     // override AssignableTypeFilter to ignore matches on the actual marker interface
+    // 第二步，判断是否要扫描指定的接口
+    // 同样也是根据@MapperScan注解中的属性做判断
     if (this.markerInterface != null) {
       addIncludeFilter(new AssignableTypeFilter(this.markerInterface) {
         @Override
@@ -183,12 +187,15 @@ public class ClassPathMapperScanner extends ClassPathBeanDefinitionScanner {
       acceptAllInterfaces = false;
     }
 
+    // 如果既没有指定注解也没有指定标记接口
+    // 那么所有.class文件都会被扫描
     if (acceptAllInterfaces) {
       // default include filter that accepts all classes
       addIncludeFilter((metadataReader, metadataReaderFactory) -> true);
     }
 
     // exclude package-info.java
+    // 排除package-info文件
     addExcludeFilter((metadataReader, metadataReaderFactory) -> {
       String className = metadataReader.getClassMetadata().getClassName();
       return className.endsWith("package-info");
@@ -201,18 +208,26 @@ public class ClassPathMapperScanner extends ClassPathBeanDefinitionScanner {
    */
   @Override
   public Set<BeanDefinitionHolder> doScan(String... basePackages) {
+    // 先调用父类ClassPathBeanDefinitionScanner#doScan()方法
+    // 扫描并将Bean信息整合成BeanDefinition注册进Spring容器，且包装成BeanDefinitionHolder返回
     Set<BeanDefinitionHolder> beanDefinitions = super.doScan(basePackages);
 
     if (beanDefinitions.isEmpty()) {
       LOGGER.warn(() -> "No MyBatis mapper was found in '" + Arrays.toString(basePackages)
           + "' package. Please check your configuration.");
     } else {
+      // 重要！！！ 将BeanDefinition的定义适配成MapperFactoryBean。（当前BeanDefinition的beanClass是Mapper Interface，是无法实例化的。）
+      // 对扫描出来的BeanDefinition做属性处理，比如添加SqlSessionFactory等
       processBeanDefinitions(beanDefinitions);
     }
 
     return beanDefinitions;
   }
 
+  // 主要做了这么几件事
+  // 1.将扫描出来的BeanDefinition的beanClass属性设置为MapperFactoryBeanClass.class
+  // 2.在BeanDefinition的ConstructorArgumentValues添加一个参数
+  // 限定实例化时使用MapperFactoryBeanClass的带参构造函数
   private void processBeanDefinitions(Set<BeanDefinitionHolder> beanDefinitions) {
     AbstractBeanDefinition definition;
     BeanDefinitionRegistry registry = getRegistry();
@@ -232,7 +247,11 @@ public class ClassPathMapperScanner extends ClassPathBeanDefinitionScanner {
 
       // the mapper interface is the original class of the bean
       // but, the actual class of the bean is MapperFactoryBean
+      // 添加构造函数参数值，当前Mapper的Class。
+      // 往构造函数的参数集合中添加了一个值，那么在实例化时就会使用带参的构造函数
+      // 等价于在XML中配置了
       definition.getConstructorArgumentValues().addGenericArgumentValue(beanClassName); // issue #59
+      // 将Bean的类型定义修改为 MapperFactoryBean，这样实例化出来的就是一个MapperFactoryBean了
       definition.setBeanClass(this.mapperFactoryBeanClass);
 
       definition.getPropertyValues().add("addToConfig", this.addToConfig);
@@ -242,10 +261,17 @@ public class ClassPathMapperScanner extends ClassPathBeanDefinitionScanner {
       definition.setAttribute(FACTORY_BEAN_OBJECT_TYPE, beanClassName);
 
       boolean explicitFactoryUsed = false;
+      // 首先检查是否在@MapperScan注解上配置了sqlSessionFactoryRef属性
       if (StringUtils.hasText(this.sqlSessionFactoryBeanName)) {
+        // 如果配置了的话，那么在这个bd的属性集合中添加一个RuntimeBeanReference
+        // 等价于在xml中配置了
+        // <property name="sqlSessionFactory" ref="sqlSessionFactoryBeanName"/>
         definition.getPropertyValues().add("sqlSessionFactory",
             new RuntimeBeanReference(this.sqlSessionFactoryBeanName));
         explicitFactoryUsed = true;
+        // 如果@MapperScan上没有进行配置
+        // 那么检查是否为这个bean配置了sqlSessionFactory属性
+        // 正常来说我们都不会进行配置，会进入自动装配的逻辑
       } else if (this.sqlSessionFactory != null) {
         definition.getPropertyValues().add("sqlSessionFactory", this.sqlSessionFactory);
         explicitFactoryUsed = true;
@@ -270,9 +296,11 @@ public class ClassPathMapperScanner extends ClassPathBeanDefinitionScanner {
 
       if (!explicitFactoryUsed) {
         LOGGER.debug(() -> "Enabling autowire by type for MapperFactoryBean with name '" + holder.getBeanName() + "'.");
+        // 如果没有显示的配置，那么设置为自动注入
         definition.setAutowireMode(AbstractBeanDefinition.AUTOWIRE_BY_TYPE);
       }
 
+      // 默认不是懒加载
       definition.setLazyInit(lazyInitialization);
 
       if (scopedProxy) {

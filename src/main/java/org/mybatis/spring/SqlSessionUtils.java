@@ -91,19 +91,35 @@ public final class SqlSessionUtils {
   public static SqlSession getSqlSession(SqlSessionFactory sessionFactory, ExecutorType executorType,
       PersistenceExceptionTranslator exceptionTranslator) {
 
+    // 空值判断
     notNull(sessionFactory, NO_SQL_SESSION_FACTORY_SPECIFIED);
     notNull(executorType, NO_EXECUTOR_TYPE_SPECIFIED);
 
+    // 从 TransactionSynchronizationManager 事务同步管理器 中拿到SqlSession的助手类
+    // 其实这里是从缓存中去那SqlSessionHolder ，该holder中有SqlSession
+    // 重点
+    // 根据SqlSessionFactory从TransactionSynchronizationManager中获取SqlSessionHolder,
+    // 这里的SqlSession就是从TransactionSynchronizationManager的 ThreadlLocal以sqlSessionFactory 为key获取到的
     SqlSessionHolder holder = (SqlSessionHolder) TransactionSynchronizationManager.getResource(sessionFactory);
 
+    // 通过holder获取SqlSession,并且将其引用计数referenceCount + 1
     SqlSession session = sessionHolder(executorType, holder);
+    // 如果缓存中有SqlSession，就直接返回了
     if (session != null) {
       return session;
     }
 
     LOGGER.debug(() -> "Creating a new SqlSession");
+    // 如果缓存中没有 sqlSession 为空，就通过sessionFactory创建一个
+    // connection 是在这里
     session = sessionFactory.openSession(executorType);
 
+    /**
+     * 这里会把SqlSession交给SqlSessionHolder ，然后缓存到 TransactionSynchronizationManager 中的一个 ThreadLocal<Map<Object, Object>> resources中
+     *
+     * registerSessionHolder的方法其实就是将SqlSessionFactory和SqlSessionHolder以key-value的方式存储在TransactionSynchronizationManager
+     * 的ThreadLocal里， 这样我们才能够从ThreadLocal里获取到对应的SqlSessionHolder
+     */
     registerSessionHolder(sessionFactory, executorType, exceptionTranslator, session);
 
     return session;
@@ -129,13 +145,19 @@ public final class SqlSessionUtils {
       PersistenceExceptionTranslator exceptionTranslator, SqlSession session) {
     SqlSessionHolder holder;
     if (TransactionSynchronizationManager.isSynchronizationActive()) {
+      // 获取对应的环境信息
       Environment environment = sessionFactory.getConfiguration().getEnvironment();
 
       if (environment.getTransactionFactory() instanceof SpringManagedTransactionFactory) {
         LOGGER.debug(() -> "Registering transaction synchronization for SqlSession [" + session + "]");
 
+        // 通过session,executorType,exceptionTranslator创建SqlSessionHolder
         holder = new SqlSessionHolder(session, executorType, exceptionTranslator);
+        // 将sessionFactory,holder以key-value的方式保存在TransactionSynchronizationManager的ThreadLocal里
+        // spring的
         TransactionSynchronizationManager.bindResource(sessionFactory, holder);
+        // 注册了一个事务同步管理器, 也有点重要的
+        // 在 事务提交/回滚调用, 可以在事务完成后执行资源清理
         TransactionSynchronizationManager
             .registerSynchronization(new SqlSessionSynchronization(holder, sessionFactory));
         holder.setSynchronizedWithTransaction(true);
@@ -189,8 +211,11 @@ public final class SqlSessionUtils {
     SqlSessionHolder holder = (SqlSessionHolder) TransactionSynchronizationManager.getResource(sessionFactory);
     if ((holder != null) && (holder.getSqlSession() == session)) {
       LOGGER.debug(() -> "Releasing transactional SqlSession [" + session + "]");
+
+      // spring管理,则使用holder进行释放，这里只是减少了一下引用计数，这样后面在本线程中可以复用
       holder.released();
     } else {
+      // 非事务直接关闭
       LOGGER.debug(() -> "Closing non transactional SqlSession [" + session + "]");
       session.close();
     }
@@ -314,6 +339,7 @@ public final class SqlSessionUtils {
     /**
      * {@inheritDoc}
      */
+    // 事务提交/回滚调用, 可以在事务完成后执行资源清理
     @Override
     public void afterCompletion(int status) {
       if (this.holderActive) {

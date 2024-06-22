@@ -30,12 +30,17 @@ import org.apache.ibatis.transaction.TransactionFactory;
  * @author Hunter Presnall
  */
 public class SpringManagedTransactionFactory implements TransactionFactory {
+  /**
+   * SpringManagedTransactionFactory 实现了TransactionFactory 接口，复写了newTransaction方法， 该方法是用来创建Transaction
+   * 事务对象的，它使用的是SpringManagedTransaction作为事务对象
+   */
 
   /**
    * {@inheritDoc}
    */
   @Override
   public Transaction newTransaction(DataSource dataSource, TransactionIsolationLevel level, boolean autoCommit) {
+    // SpringManagedTransaction对事务的操作还是使用的是JDBC的connection 事务方法 来完成的，只是做了一个封装而已
     return new SpringManagedTransaction(dataSource);
   }
 

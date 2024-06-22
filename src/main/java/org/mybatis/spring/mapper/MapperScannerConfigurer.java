@@ -332,6 +332,7 @@ public class MapperScannerConfigurer
    */
   @Override
   public void afterPropertiesSet() throws Exception {
+    // 几乎啥也没干，就断言了个扫描包路径不为空
     notNull(this.basePackage, "Property 'basePackage' is required");
   }
 
@@ -348,18 +349,22 @@ public class MapperScannerConfigurer
    *
    * @since 1.0.2
    */
-  @Override
+  @Override // 重点方法
   public void postProcessBeanDefinitionRegistry(BeanDefinitionRegistry registry) {
     if (this.processPropertyPlaceHolders) {
+      // 解析并更新Spring配置文件中MapperScannerConfigurer相关的配置
       processPropertyPlaceHolders();
     }
 
+    // 创建类路径Mapper扫描器，并配置基本信息如扫描的注解（过滤条件）等。
+    // 写了它的doScan、registerFilters等方法
     ClassPathMapperScanner scanner = new ClassPathMapperScanner(registry);
     scanner.setAddToConfig(this.addToConfig);
     scanner.setAnnotationClass(this.annotationClass);
     scanner.setMarkerInterface(this.markerInterface);
     scanner.setSqlSessionFactory(this.sqlSessionFactory);
     scanner.setSqlSessionTemplate(this.sqlSessionTemplate);
+    // SqlSessionFactory
     scanner.setSqlSessionFactoryBeanName(this.sqlSessionFactoryBeanName);
     scanner.setSqlSessionTemplateBeanName(this.sqlSessionTemplateBeanName);
     scanner.setResourceLoader(this.applicationContext);
@@ -372,6 +377,9 @@ public class MapperScannerConfigurer
       scanner.setDefaultScope(defaultScope);
     }
     scanner.registerFilters();
+    // 根据配置好的信息去扫描basePackage字段中指定的包及其子包
+    // 根据条件扫描Mapper并整合成BeanDefintions注册进Spring
+    // 最终里面会调用 org.mybatis.spring.mapper.ClassPathMapperScanner.doScan
     scanner.scan(
         StringUtils.tokenizeToStringArray(this.basePackage, ConfigurableApplicationContext.CONFIG_LOCATION_DELIMITERS));
   }
@@ -383,6 +391,11 @@ public class MapperScannerConfigurer
    * definition. Then update the values.
    */
   private void processPropertyPlaceHolders() {
+    // 上面Spring官方的注释的意思如下：BeanDefinitionRegistries
+    // 在Spring启动的时候回调地太早了，在BeanFactoryPostProcessors之后（PropertyResourceConfigurer实现了BeanFactoryProcessor）
+    // 方法调用到此处的时候，相关的配置信息还没被载入进来，都是空，会有问题。所以我们要提前主动触发(getBeanOfType与getBean逻辑一致，都是先拿，拿不到就实例化再存入三级缓存)PropertyResourceConfigurer的实例化，这样相关的配置就能够被载入进来了。
+
+    // 先主动触发该类型的Bean的实例化
     Map<String, PropertyResourceConfigurer> prcs = applicationContext.getBeansOfType(PropertyResourceConfigurer.class,
         false, false);
 
@@ -402,6 +415,7 @@ public class MapperScannerConfigurer
 
       PropertyValues values = mapperScannerBean.getPropertyValues();
 
+      // 更新相关重要字段信息
       this.basePackage = getPropertyValue("basePackage", values);
       this.sqlSessionFactoryBeanName = getPropertyValue("sqlSessionFactoryBeanName", values);
       this.sqlSessionTemplateBeanName = getPropertyValue("sqlSessionTemplateBeanName", values);

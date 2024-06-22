@@ -68,19 +68,26 @@ public class MapperScannerRegistrar implements ImportBeanDefinitionRegistrar, Re
    */
   @Override
   public void registerBeanDefinitions(AnnotationMetadata importingClassMetadata, BeanDefinitionRegistry registry) {
+    // 获取到@MapperScan这个注解中的属性
     AnnotationAttributes mapperScanAttrs = AnnotationAttributes
         .fromMap(importingClassMetadata.getAnnotationAttributes(MapperScan.class.getName()));
     if (mapperScanAttrs != null) {
+      // 重点, 紧接着开始向Spring容器中注册bd
       registerBeanDefinitions(importingClassMetadata, mapperScanAttrs, registry,
           generateBaseBeanName(importingClassMetadata, 0));
     }
   }
 
+  // 核心
   void registerBeanDefinitions(AnnotationMetadata annoMeta, AnnotationAttributes annoAttrs,
       BeanDefinitionRegistry registry, String beanName) {
 
+    // 打算注册到容器中的bd的beanClass属性为MapperScannerConfigurer.class
     BeanDefinitionBuilder builder = BeanDefinitionBuilder.genericBeanDefinition(MapperScannerConfigurer.class);
     builder.addPropertyValue("processPropertyPlaceHolders", true);
+
+    // 这部分代码就是将注解中的属性获取出来
+    // 放到MapperScannerConfigurer这个beanDefinition中
 
     Class<? extends Annotation> annotationClass = annoAttrs.getClass("annotationClass");
     if (!Annotation.class.equals(annotationClass)) {
@@ -138,6 +145,7 @@ public class MapperScannerRegistrar implements ImportBeanDefinitionRegistrar, Re
 
     builder.addPropertyValue("basePackage", StringUtils.collectionToCommaDelimitedString(basePackages));
 
+    // 最后将这个beanDefinition注册到容器中
     registry.registerBeanDefinition(beanName, builder.getBeanDefinition());
 
   }

@@ -125,9 +125,19 @@ public class SqlSessionTemplate implements SqlSession, DisposableBean {
     notNull(sqlSessionFactory, "Property 'sqlSessionFactory' is required");
     notNull(executorType, "Property 'executorType' is required");
 
+    // SqlSession工厂
     this.sqlSessionFactory = sqlSessionFactory;
+    // 执行器类型
     this.executorType = executorType;
     this.exceptionTranslator = exceptionTranslator;
+    /**
+     * SqlSession代理对象, 使用 Proxy.newProxyInstance 为 SqlSession 创建代理 SqlSessionInterceptor 重点
+     *
+     * SqlSessionInterceptor作为SqlSession的拦截器它实现了InvocationHandler接口，复写了invoke方法，当SqlSessionTemplate的方法被调用就会触发SqlSessionInterceptor#invoke的执行(JDK动态代理)。
+     * SqlSessionTemplate” 是Spring管理的线程安全的SqlSession，它与 Spring 事务管理一起工作，以确保实际使用的 SqlSession 是与当前 Spring 事务相关联的。
+     * 此外，它还管理会话生命周期，包括根据 Spring 事务配置根据需要关闭、提交或回滚会话。 也就是说在Spirng整合了Mybatis之后，不是直接使用SqlSession,而是使用SqlSessionTemplate
+     * 来管理SqlSession的生命周期，它是线程安全的，并且和事务一起工作的。SqlSession的默认实现DefaultSqlSession 是线程不安全的
+     */
     this.sqlSessionProxy = (SqlSession) newProxyInstance(SqlSessionFactory.class.getClassLoader(),
         new Class[] { SqlSession.class }, new SqlSessionInterceptor());
   }
@@ -309,6 +319,7 @@ public class SqlSessionTemplate implements SqlSession, DisposableBean {
    */
   @Override
   public <T> T getMapper(Class<T> type) {
+    // 看getMapper方法第二个参数是 this, 是 sqlSessionTemplate
     return getConfiguration().getMapper(type, this);
   }
 
@@ -421,20 +432,29 @@ public class SqlSessionTemplate implements SqlSession, DisposableBean {
   private class SqlSessionInterceptor implements InvocationHandler {
     @Override
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+      // 1.创建一个 SqlSession,默认实现是DefaultSqlSession，底层一样是通过 SqlSessionFactory#openSession
+      // getSqlSession 是重点, 和spring结合在这边
       SqlSession sqlSession = getSqlSession(SqlSessionTemplate.this.sqlSessionFactory,
           SqlSessionTemplate.this.executorType, SqlSessionTemplate.this.exceptionTranslator);
+
       try {
+
+        // 2.执行方法，比如：DefaultSqlSession#selectOne
         Object result = method.invoke(sqlSession, args);
+        // 检查是否开启了事务，如果没有开启事务那么强制提交
         if (!isSqlSessionTransactional(sqlSession, SqlSessionTemplate.this.sqlSessionFactory)) {
           // force commit even on non-dirty sessions because some databases require
           // a commit/rollback before calling close()
+          // 3.提交
           sqlSession.commit(true);
         }
+        // 返回结果
         return result;
       } catch (Throwable t) {
         Throwable unwrapped = unwrapThrowable(t);
         if (SqlSessionTemplate.this.exceptionTranslator != null && unwrapped instanceof PersistenceException) {
           // release the connection to avoid a deadlock if the translator is no loaded. See issue #22
+          // 如果出现异常,则调用SqlSessionUtils的closeSqlSession方法,这里执行后finally就不会再执行closeSqlSession了 因为sqlSession 被置为null了
           closeSqlSession(sqlSession, SqlSessionTemplate.this.sqlSessionFactory);
           sqlSession = null;
           Throwable translated = SqlSessionTemplate.this.exceptionTranslator
@@ -445,6 +465,7 @@ public class SqlSessionTemplate implements SqlSession, DisposableBean {
         }
         throw unwrapped;
       } finally {
+        // 关闭 sqlSession, 所以执行完就会关闭 sqlSession
         if (sqlSession != null) {
           closeSqlSession(sqlSession, SqlSessionTemplate.this.sqlSessionFactory);
         }
