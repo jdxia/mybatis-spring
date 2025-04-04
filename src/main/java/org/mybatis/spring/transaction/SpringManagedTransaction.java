@@ -143,6 +143,7 @@ public class SpringManagedTransaction implements Transaction {
   public Integer getTimeout() throws SQLException {
     ConnectionHolder holder = (ConnectionHolder) TransactionSynchronizationManager.getResource(dataSource);
     if (holder != null && holder.hasTimeout()) {
+      // 获取和检查超时时间
       return holder.getTimeToLiveInSeconds();
     }
     return null;
